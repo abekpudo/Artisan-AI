@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ArtisanGuide } from "../types";
 
-const SYSTEM_INSTRUCTION = `Role: You are the "Master Artisan AI," a vocational mentor for youth in Nigeria.
+const SYSTEM_INSTRUCTION = `Role: You are "Oga AI," a vocational mentor for youth in Nigeria.
 Objective: Provide practical, safety-first, step-by-step instructions for manual trades.
 Tone: Simple English/Pidgin mix where appropriate. Be encouraging but firm on safety.
 Output Requirement: You must ALWAYS respond in a strict JSON format.`;
@@ -24,10 +24,9 @@ const RESPONSE_SCHEMA = {
       }
     },
     pro_tip: { type: Type.STRING, description: "A local tip or 'hack' for Nigerian materials" },
-    bing_query: { type: Type.STRING, description: "specific technical diagram search term" },
     youtube_query: { type: Type.STRING, description: "step by step video search term" }
   },
-  required: ["title", "safety", "tools", "steps", "pro_tip", "bing_query", "youtube_query"]
+  required: ["title", "safety", "tools", "steps", "pro_tip", "youtube_query"]
 };
 
 export async function generateArtisanGuide(query: string, signal?: AbortSignal): Promise<ArtisanGuide> {
@@ -53,28 +52,6 @@ export async function generateArtisanGuide(query: string, signal?: AbortSignal):
     timestamp: Date.now(),
     id: crypto.randomUUID(),
   };
-}
-
-export async function fetchWikimediaImages(query: string): Promise<string[]> {
-  try {
-    const url = `https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&prop=pageimages|images&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrlimit=4&piprop=thumbnail&pithumbsize=500`;
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    if (!data.query || !data.query.pages) return [];
-    
-    const images: string[] = [];
-    Object.values(data.query.pages).forEach((page: any) => {
-      if (page.thumbnail && page.thumbnail.source) {
-        images.push(page.thumbnail.source);
-      }
-    });
-    
-    return images;
-  } catch (error) {
-    console.error("Wikimedia Image Search Error:", error);
-    return [];
-  }
 }
 
 export async function fetchYouTubeVideo(query: string): Promise<string | undefined> {

@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArtisanGuide } from './types';
-import { generateArtisanGuide, fetchWikimediaImages, fetchYouTubeVideo } from './services/artisanService';
+import { generateArtisanGuide, fetchYouTubeVideo } from './services/artisanService';
 
 const SkeletonGuide = () => (
   <div className="space-y-6 animate-pulse">
@@ -32,7 +32,6 @@ const SkeletonGuide = () => (
       <div className="h-4 w-48 bg-stone-200 rounded" />
     </div>
     <div className="h-24 bg-orange-100 rounded-2xl" />
-    <div className="h-32 bg-stone-200 rounded-3xl" />
     <div className="space-y-4">
       <div className="h-4 w-32 bg-stone-200 rounded px-2" />
       {[1, 2, 3].map(i => (
@@ -51,6 +50,7 @@ export default function App() {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [view, setView] = useState<'home' | 'guide' | 'history'>('home');
   const [isListening, setIsListening] = useState(false);
+  const [showRefreshConfirm, setShowRefreshConfirm] = useState(false);
   
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -81,7 +81,7 @@ export default function App() {
   };
 
   const saveToHistory = (guide: ArtisanGuide) => {
-    const newHistory = [guide, ...history.filter(h => h.id !== guide.id)].slice(0, 20);
+    const newHistory = [guide, ...history.filter(h => h.title !== guide.title)].slice(0, 20);
     setHistory(newHistory);
     localStorage.setItem('artisan_history', JSON.stringify(newHistory));
   };
@@ -102,14 +102,14 @@ export default function App() {
       const guide = await generateArtisanGuide(searchQuery, abortControllerRef.current.signal);
       
       // Fetch media in parallel
-      const [images, videoId] = await Promise.all([
-        fetchWikimediaImages(guide.bing_query),
+      const [videoId] = await Promise.all([
         fetchYouTubeVideo(guide.youtube_query)
       ]);
 
-      const fullGuide = { ...guide, images, videoId };
+      const fullGuide = { ...guide, videoId };
       setCurrentGuide(fullGuide);
       saveToHistory(fullGuide);
+      setQuery('');
     } catch (error: any) {
       if (error.message === 'Aborted') {
         console.log("Search aborted by user");
@@ -233,7 +233,7 @@ export default function App() {
           <div className="bg-orange-600 p-1.5 rounded-lg text-white">
             <Hammer size={20} />
           </div>
-          <h1 className="font-bold text-lg tracking-tight">Artisan AI</h1>
+          <h1 className="font-bold text-lg tracking-tight">Oga AI</h1>
         </div>
         
         <button 
@@ -376,7 +376,7 @@ export default function App() {
                     <Share2 size={20} />
                   </button>
                   <button 
-                    onClick={() => handleSearch(undefined, currentGuide?.title)}
+                    onClick={() => setShowRefreshConfirm(true)}
                     disabled={loading || isOffline}
                     className="flex items-center gap-2 text-orange-600 font-bold text-sm bg-orange-50 px-3 py-1.5 rounded-xl hover:bg-orange-100 transition-colors disabled:opacity-50"
                   >
@@ -468,41 +468,22 @@ export default function App() {
                   </div>
 
                   {/* Media Section */}
-                  {(currentGuide.images?.length || currentGuide.videoId) && (
+                  {currentGuide.videoId && (
                     <div className="space-y-6 pt-4">
-                      {currentGuide.images && currentGuide.images.length > 0 && (
-                        <div className="space-y-3">
-                          <h4 className="font-bold text-stone-400 text-xs uppercase tracking-widest px-2">Visual Reference</h4>
-                          <div className="grid grid-cols-2 gap-2">
-                            {currentGuide.images.map((img, i) => (
-                              <img 
-                                key={i} 
-                                src={img} 
-                                alt={`Reference ${i}`} 
-                                className="w-full aspect-square object-cover rounded-2xl border border-stone-200"
-                                referrerPolicy="no-referrer"
-                              />
-                            ))}
-                          </div>
+                      <div className="space-y-3">
+                        <h4 className="font-bold text-stone-400 text-xs uppercase tracking-widest px-2">Video Tutorial</h4>
+                        <div className="aspect-video bg-stone-200 rounded-3xl overflow-hidden border border-stone-200">
+                          <iframe
+                            width="100%"
+                            height="100%"
+                            src={`https://www.youtube.com/embed/${currentGuide.videoId}`}
+                            title="YouTube video player"
+                            frameBorder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                          ></iframe>
                         </div>
-                      )}
-
-                      {currentGuide.videoId && (
-                        <div className="space-y-3">
-                          <h4 className="font-bold text-stone-400 text-xs uppercase tracking-widest px-2">Video Tutorial</h4>
-                          <div className="aspect-video bg-stone-200 rounded-3xl overflow-hidden border border-stone-200">
-                            <iframe
-                              width="100%"
-                              height="100%"
-                              src={`https://www.youtube.com/embed/${currentGuide.videoId}`}
-                              title="YouTube video player"
-                              frameBorder="0"
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                              allowFullScreen
-                            ></iframe>
-                          </div>
-                        </div>
-                      )}
+                      </div>
                     </div>
                   )}
                 </>
@@ -581,6 +562,53 @@ export default function App() {
           <Search size={24} />
         </motion.button>
       )}
+      {/* Confirmation Dialog */}
+      <AnimatePresence>
+        {showRefreshConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowRefreshConfirm(false)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative bg-white rounded-3xl p-6 shadow-2xl max-w-sm w-full space-y-4"
+            >
+              <div className="bg-orange-100 w-12 h-12 rounded-full flex items-center justify-center text-orange-600">
+                <RefreshCw size={24} />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xl font-bold text-stone-900">Refresh Guide?</h3>
+                <p className="text-stone-500 text-sm leading-relaxed">
+                  This go generate a fresh version of the guide. You sure say you wan refresh?
+                </p>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={() => setShowRefreshConfirm(false)}
+                  className="flex-1 px-4 py-3 rounded-2xl bg-stone-100 text-stone-600 font-bold text-sm hover:bg-stone-200 transition-colors"
+                >
+                  No, cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowRefreshConfirm(false);
+                    handleSearch(undefined, currentGuide?.title);
+                  }}
+                  className="flex-1 px-4 py-3 rounded-2xl bg-orange-600 text-white font-bold text-sm hover:bg-orange-700 transition-colors shadow-lg shadow-orange-200"
+                >
+                  Yes, refresh
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
